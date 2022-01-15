@@ -5,39 +5,40 @@ import java.util.Iterator;
 
 /**
  * Board contains the logic for John Conway's Game of Life.
- * 
  * @author Sharon
  * @version 1.0
  */
 public class Board {
 
     /** Constant value of the number of rows for the grid. */
-    final int LAST_ROW;
+    final int ROWS;
 
     /** Constant value of the number of columns for the grid. */
-    final int LAST_COL;
+    final int COLS;
 
     /** Contains Cell objects representing each cell of the grid. */
     private Cell[][] grid;
 
-
+    /** Contains cells that had their states changed. */
     private HashSet<Cell> changedCells = new HashSet<Cell>();
-    private HashSet<Cell> neighbouringCells = new HashSet<Cell>();
+    
+    /** Contains neighbours of a cell that had its state changed. */
+    private HashSet<Cell> cellsToEval = new HashSet<Cell>();
 
+    /** Scanner for receiving user input. */
     private Scanner scan; 
     /**
      * Constructor for the Board class.
-     * 
      * @param r the number of rows in the grid
      * @param c the number of columns in the grid
      */
     public Board(int r, int c) {
-        LAST_ROW = r;
-        LAST_COL = c;
+        ROWS = r;
+        COLS = c;
         scan = new Scanner(System.in);
-        grid = new Cell[LAST_ROW][LAST_COL];
-        for (int row = 0; row < LAST_ROW; row++) {
-            for (int col = 0; col < LAST_COL; col++) {
+        grid = new Cell[ROWS][COLS];
+        for (int row = 0; row < ROWS; row++) {
+            for (int col = 0; col < COLS; col++) {
                 /*
                  * Grids use [row, column]. Cells have(x,y) coordinates. 
                  * Grid[row][column] => Cell(column, row)
@@ -59,7 +60,7 @@ public class Board {
             input = scan.nextInt();
             switch (input) {
             case 1: 
-                System.out.println("Sorry this option is under construction...");
+                inputCoordinates();
                 break; 
             case 2: 
                 nextTurn(); 
@@ -80,11 +81,38 @@ public class Board {
      * Prints out a menu option with available actions.
      */
     private void displayMenu() {
-        System.out.println("\n1) Change Cell States");
+        System.out.println("\n1) Select a cell"); 
         System.out.println("2) Next Turn");
         System.out.println("3) Exit");
     }
 
+    private void inputCoordinates() {
+        int row; 
+        int col; 
+        System.out.println("Specify cell coordinate:\nx = ?");
+        col = validateCoordinate("x", scan.nextInt()); 
+        System.out.println("y = ?");
+        row = validateCoordinate("y", scan.nextInt()); 
+        String state = grid[row][col].changeState()? "activated" : "deactivated"; 
+        System.out.println("Cell[" + row + "][" + col + "] " + state);
+    }
+    
+    private int validateCoordinate(String axis, int pos) {
+        int boundary = axis.equals("x")? COLS : ROWS; 
+        boolean valid = false; 
+        while(!valid)
+            if(pos >= 0 && pos < boundary) {
+                return pos; 
+            } else {
+                System.out.println("Invalid input. Outside range of " + axis 
+                        + " axis."); 
+                System.out.println(axis + " = ?"); 
+                pos = scan.nextInt(); 
+            }
+        return 0; 
+    }
+    
+    
     /**
      * Activates the cell located at the specified coordinate.
      * @param x value of the x coordinate
@@ -93,6 +121,7 @@ public class Board {
     public void activateCell(int x, int y) {
         grid[y][x].setState(true);
     }
+    
 
     /**
      * Goes through the actions required for each turn. Count the number of
@@ -103,12 +132,12 @@ public class Board {
             cell.updateNeighbours(); 
         }
         changedCells.clear(); 
-        for(Cell cell : neighbouringCells) {
+        for(Cell cell : cellsToEval) {
             if(cell.isStateChanged()) {
                 changedCells.add(cell); 
             }
         }
-        neighbouringCells.clear(); 
+        cellsToEval.clear(); 
     }
 
     /**
@@ -119,7 +148,7 @@ public class Board {
     public String gridToString(Cell[][] grid) {
         String str = " ";
         // Adds column label
-        for (int col = 0; col < LAST_COL; col++) {
+        for (int col = 0; col < COLS; col++) {
             str += " " + col + " ";
         }
         for (int row = 0; row < grid.length; row++) {
@@ -169,6 +198,11 @@ public class Board {
             this.y = y;
         }
 
+        public boolean changeState() {
+            setState(!state); 
+            return state; 
+        }
+        
         /**
          * Setter method for the state.
          * @param newState value of the new state
@@ -176,6 +210,7 @@ public class Board {
         public void setState(boolean newState) {
            state = newState;
            changedCells.add(this); 
+           cellsToEval.add(this); 
         }
 
         /**
@@ -185,9 +220,9 @@ public class Board {
          */
         private void updateNeighbours() {
             int colStart = (x - 1 < 0) ? x : x - 1;
-            int colEnd = (x + 1 < LAST_COL) ? x + 1 : x;
+            int colEnd = (x + 1 < COLS) ? x + 1 : x;
             int rowStart = (y - 1 < 0) ? y : y - 1;
-            int rowEnd = (y + 1 < LAST_ROW) ? y + 1 : y;
+            int rowEnd = (y + 1 < ROWS) ? y + 1 : y;
             for (int r = rowStart; r <= rowEnd; r++) {
                 for (int c = colStart; c <= colEnd; c++) {
                     if (!(r == y && c == x)) {
@@ -196,7 +231,7 @@ public class Board {
                         } else {
                             grid[r][c].subtractNeighbour();
                         }
-                        neighbouringCells.add(grid[r][c]);
+                        cellsToEval.add(grid[r][c]);
                     }
                 }
             }
@@ -207,14 +242,19 @@ public class Board {
          * @return true if state has changed or false if unchanged
          */
         public boolean isStateChanged() { 
+            System.out.println("Grid[" + getY() + "][" + getX() + "]" + 
+        "\nNeighbours: " + neighbourCount + 
+        "\nCurrently - " + state);
             if (state) {
                 if (neighbourCount < 2 || neighbourCount > 3) {
                     setState(false); 
+                    System.out.println("CHANGED TO " + state); 
                     return true;
                 }
             } else {
                 if (neighbourCount == 3) {
                     setState(true); 
+                    System.out.println("CHANGED TO " + state); 
                     return true;
                 }
             }
@@ -268,11 +308,7 @@ public class Board {
          * @return string representation of the state
          */
         public String toString() {
-            if (state) {
-                return "X";
-            } else {
-                return " ";
-            }
+            return state? "X" : " "; 
         }
     }
 }
